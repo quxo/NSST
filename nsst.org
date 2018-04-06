@@ -1,0 +1,12 @@
+* TODO Main menu
+  + [ ] Make a menu with the services offered.
+  + 
+
+* TODO youtube 
+  + [ ] Define a struct with the video info
+  + [ ] Get video id's of all videos in a certain page
+  + [ ] Function that loops over all the obtained id's, gets the video
+    info for each and transforms it to the video info struct.
+  + [ ] Write a html template that receives a list of video info
+    struct and shows the picture, title, duration and username
+  + [ ] Write documentation.
