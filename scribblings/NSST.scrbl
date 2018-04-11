@@ -3,7 +3,7 @@
                     racket/base]]
 
 @title{NSST}
-@author{oscar}
+@author{Oscar Alberto Quijano Xacur}
 
 @defmodule[NSST]
 

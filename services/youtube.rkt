@@ -8,85 +8,47 @@
 (require html-parsing)
 (require json)
 
-(struct video-info (thumbail-url title  author) #:transparent)
+(struct video-info (thumbnail-url title duration  author) #:transparent)
 
 
-(define (page->sxml url-string)  
+
+(define (page->sxml url-string)
+  ;; Transforms a url string to sxml.
   (html->xexp
    (port->string
     (get-pure-port (string->url url-string) #:redirections 1 ))))
 
-;; (define (page->file page-url file)
-;;   (with-output-to-file file
-;;     (lambda ()
-;;       (print (srl:sxml->html (page->sxml page-url)))
-;;       )
-;;     #:exists 'replace
-;;     ))
+
+(define (get-video-ids-in-page yt-page-sxml)
+  ;; Gets all the video ids from a youtube page converted to sxml.
+  (define all-ids-hrefs ((sxpath "//a[starts-with(@href,\"/watch?v=\")]/@href/text()") yt-page-sxml ) )  
+  (define all-ids (map (lambda (elem)
+			 (cadr (regexp-match #rx"/watch\\?v=(.*)" elem)))
+		       all-ids-hrefs))
+  (remove-duplicates all-ids))
 
 
-;; (define (get-video-json video-id)
-;;   (read-json
-;;    (get-pure-port (string->url
-;; 		   (format "https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v=~a" video-id)) )))
-
-(define (get-video-ids-in-page url-string)
-  (define yt-page-xexp (page->sxml url-string))
-  (define all-hrefs ((sxpath '(// a @ href)) yt-page-xexp) )
-  (define ids-with-false
-    (map   
-     (lambda (elem)
-       (define path (cadr elem))
-       (define aux (regexp-match #rx"/watch\\?v=(.*)" path))
-       (if aux (cadr aux) aux))
-   
-     all-hrefs
-     ))
-  
-  (filter (lambda (x) x) ids-with-false))
-
-
-;; (define (id->video-info video-id)
-;;   (define video-info-json (get-video-json video-id))
-;;   (video-info (hash-ref video-info-json 'thumbnail_url)
-;; 	      (hash-ref video-info-json 'title)
-;; 	      (hash-ref video-info-json 'author_name)))
-
-;; (define (get-page-info yt-page)
-;;   (define s-page (page->sxml yt-page))
-;;   (car ((sxpath "//ytd-grid-video-renderer/") s-page))
-;;   )
-
-;; (define (get-videos-info-in-page url-string)
-;;   (map id->video-info (get-video-ids-in-page url-string)))
-
-
-;(define a (page->sxml "https://youtube.com"))
-
-;(srl:sxml->html a "/tmp/output")
-
-;; (with-output-to-file "/tmp/output"
-;;   (lambda ()
-;;     (print a  )
-;;     ))
-
-;; (define b
-;;   ((sxpath "//a[starts-with(@href,\"/watch?\") and @title]/@title  | //a[starts-with(@href,\"/watch?\")]/div/span/img/@data-thumb | //a[starts-with(@href,\"/watch?\")]/div/span/span[@class=\"video-time\"]/text() ") a))
 
 (define (thumbnail-from-video-id video-id )
+  ;; Given a video id, returns the path to the thumbnail of the video.
+  
   (string-append "https://i.ytimg.com/vi/"
 		 video-id
 		 "/hqdefault.jpg"  ))
 
 
 (define (title-from-video-id video-id page-sxml)
+  ;; Given a video id and the corresponding youtube page sxml, it
+  ;; returns the title of the video.
   (define watch-url (string-append "/watch?v=" video-id ))
   (define xpath-string (string-append "//h3/a[@href = \"" watch-url
 				      "\" and @title]/@title/text()"))  
-  ((sxpath xpath-string  ) page-sxml))
+  (car ((sxpath xpath-string  ) page-sxml)))
 
 
 (define (duration-from-video-id video-id page-sxml)
+  ;; Returns the duration of a vide given the video-id and the youtube
+  ;; page converted to sxml.
   (define watch-url (string-append "/watch?v=" video-id ))
   (define xpath-string (string-append "//h3[a/@href = \"" watch-url
 				      "\"]/span/text()"))
@@ -105,23 +67,63 @@
 ;  ((sxpath "//a/text()") complete-username-link-sxml )
   (values username username-link))
 
+(define (video-id->video-info video-id yt-sxml-page)
+  ;; Returns a video-info struct given a video-id
+  (define thumbnail-url (thumbnail-from-video-id video-id))
+  (define title (title-from-video-id video-id yt-sxml-page))
+  (define duration (duration-from-video-id video-id yt-sxml-page))
+  (define-values (author author-url) (get-user-from-video-id video-id yt-sxml-page))
+  (video-info thumbnail-url title duration author)
+  )
 
 
+
+(module+ showpage
+  (require web-server/templates)
+  (require web-server/servlet)
+  (require web-server/servlet-env)
+
+  (define-syntax-rule (template-response body ...)  
+    (response/full
+     200 #"Okay"
+     (current-seconds) TEXT/HTML-MIME-TYPE
+     empty
+     (list (string->bytes/utf-8
+	    body ...	    
+	    )) )  
+    )
+
+  (define (videos-info-from-page yt-page)
+    ;;; Returns a list with video-info structures for all the videos
+    ;;; in the page.
+    (define yt-page-sxml (page->sxml yt-page) )
+    (define ids (get-video-ids-in-page yt-page-sxml))
+    
+    (define videos-info-list
+      (map (lambda (x)
+	     (video-id->video-info x yt-page-sxml))
+	   ids))
+    videos-info-list
+    )
   
 
+  (define (yt-main-menu req)
+    (let ([vinfo-list (videos-info-from-page "https://youtube.com")   ])
+      (template-response "../templates/yt_menu.html")
+      )
+    )
 
-
-
-;; ((sxpath "//a[div/span[@class]") a)
-
-;; (define b ((sxpath "//a[starts-with(@href,\"/watch?\") and div/span]") a))
-
-;; ((sxpath "//@href | //img/@data-thumb | //span[@class=\"video-time\"]") b)
-
-  ;; ;((sxpath "//a[starts-with(@href,\"/watch?\") and div/span]/@href | ") a)
   
-	
+   (serve/servlet yt-main-menu
+		 #:launch-browser? #f
+		 #:quit? #f
+		 #:servlet-path "/")
+  
+  )
 
+
+
+ 
 (module+ trials
   
   (require sxml)
