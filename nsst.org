@@ -6,14 +6,14 @@
 
 * TODO youtube 
   1. [X] Define a struct with the video info
-  2. [ ] In the submodule showpage of youtube.rkt, there is an error
+  2. [X] In the submodule showpage of youtube.rkt, there is an error
      when video-info-from-page is called. It seems it happens when
      there is a video for which not all the information is available
      on the page. So, not all the defined functions to extract
      infomation work properly. Fix it.
-  3. [ ] Get video id's of all videos in a certain page
-  4. [ ] Function that loops over all the obtained id's, gets the video
+  3. [X] Get video id's of all videos in a certain page
+  4. [X] Function that loops over all the obtained id's, gets the video
      info for each and transforms it to the video info struct.
-  5. [ ] Write a html template that receives a list of video info
+  5. [X] Write a html template that receives a list of video info
      struct and shows the picture, title, duration and username
   6. [ ] Write documentation.

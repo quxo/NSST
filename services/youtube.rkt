@@ -69,16 +69,19 @@
 
 (define (video-id->video-info video-id yt-sxml-page)
   ;; Returns a video-info struct given a video-id
-  (define thumbnail-url (thumbnail-from-video-id video-id))
-  (define title (title-from-video-id video-id yt-sxml-page))
-  (define duration (duration-from-video-id video-id yt-sxml-page))
-  (define-values (author author-url) (get-user-from-video-id video-id yt-sxml-page))
-  (video-info thumbnail-url title duration author)
+  (with-handlers ([exn:fail?
+		   (lambda (v) empty)])
+    (define thumbnail-url (thumbnail-from-video-id video-id)) 
+    (define title (title-from-video-id video-id yt-sxml-page))
+    (define duration (duration-from-video-id video-id yt-sxml-page))
+    (define-values (author author-url) (get-user-from-video-id video-id yt-sxml-page))
+    (video-info thumbnail-url title duration author))
   )
 
 
 
 (module+ showpage
+  
   (require web-server/templates)
   (require web-server/servlet)
   (require web-server/servlet-env)
@@ -90,8 +93,7 @@
      empty
      (list (string->bytes/utf-8
 	    body ...	    
-	    )) )  
-    )
+	    )) ))
 
   (define (videos-info-from-page yt-page)
     ;;; Returns a list with video-info structures for all the videos
@@ -103,22 +105,23 @@
       (map (lambda (x)
 	     (video-id->video-info x yt-page-sxml))
 	   ids))
-    videos-info-list
-    )
+    
+    (filter (lambda (x)
+	      (not (null? x)))
+	    videos-info-list) )
   
 
   (define (yt-main-menu req)
     (let ([vinfo-list (videos-info-from-page "https://youtube.com")   ])
-      (template-response "../templates/yt_menu.html")
-      )
-    )
+      (template-response (include-template "../templates/yt_menu.html"))))
 
   
    (serve/servlet yt-main-menu
-		 #:launch-browser? #f
-		 #:quit? #f
-		 #:servlet-path "/")
-  
+   		 #:launch-browser? #f
+   		 #:quit? #f
+		 #:server-root-path "../templates"
+   		 #:servlet-path "/")
+   
   )
 
 
